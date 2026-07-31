@@ -3,7 +3,7 @@
 # tres ambientes de esta misma carpeta comparten siempre la misma versión de
 # módulo; para versiones distintas simultáneas haría falta carpeta por ambiente.
 module "site_bucket" {
-  source = "git::https://github.com/julian-mediina/terraform-modules.git//modules/s3-site?ref=v0.1.0"
+  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/s3-site?ref=v0.1.0"
 
   bucket_name   = "${var.project}-${var.environment}-site"
   environment   = var.environment
@@ -13,7 +13,7 @@ module "site_bucket" {
 }
 
 module "cdn" {
-  source = "git::https://github.com/julian-mediina/terraform-modules.git//modules/cloudfront-oac?ref=v0.1.0"
+  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/cloudfront-oac?ref=v0.1.0"
 
   environment                 = var.environment
   bucket_id                   = module.site_bucket.bucket_id
@@ -26,7 +26,7 @@ module "cdn" {
 }
 
 module "observability" {
-  source = "git::https://github.com/julian-mediina/terraform-modules.git//modules/observability?ref=v0.1.0"
+  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/observability?ref=v0.1.0"
 
   environment                 = var.environment
   distribution_id             = module.cdn.distribution_id

@@ -1,6 +1,6 @@
 # terraform-live
 
-Infraestructura por ambiente de la plataforma DaviPlata. Este repo **no declara recursos propios**: `live/` solo compone módulos publicados en [`terraform-modules`](https://github.com/julian-mediina/terraform-modules), fijados por tag (`?ref=vX.Y.Z`).
+Infraestructura por ambiente de la plataforma DaviPlata. Este repo **no declara recursos propios**: `live/` solo compone módulos publicados en [`terraform-modules`](https://github.com/JulianMediina/terraform-modules), fijados por tag (`?ref=vX.Y.Z`).
 
 > Nota sobre la guía original: una versión anterior del documento de referencia mencionaba una carpeta `global/bootstrap/` dentro de este repo. Esa responsabilidad se consolidó por completo en el repo `terraform-foundation` (repo independiente, estado local, ejecución única) para respetar la separación de responsabilidades del §0/§4.1 — aquí no existe.
 
