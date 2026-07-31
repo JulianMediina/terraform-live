@@ -1,0 +1,13 @@
+framework:
+  - terraform
+download-external-modules: false
+compact: true
+quiet: false
+soft-fail: false
+skip-check:
+  # CKV_TF_1: el diseño de la plataforma versiona los módulos por tag
+  # semántico (vX.Y.Z), no por hash de commit — es la estrategia de
+  # versionamiento documentada en terraform-modules, no un descuido. El tag
+  # solo se publica si module-ci.yml (fmt/validate/tflint/tfsec/checkov)
+  # pasó y el commit pertenece a main.
+  - CKV_TF_1
