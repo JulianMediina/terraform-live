@@ -1,0 +1,5 @@
+bucket         = "daviplata-tfstate-integracion"
+key            = "integracion/terraform.tfstate"
+region         = "us-east-1"
+dynamodb_table = "daviplata-tflock-integracion"
+encrypt        = true

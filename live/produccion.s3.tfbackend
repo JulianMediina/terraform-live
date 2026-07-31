@@ -1,0 +1,5 @@
+bucket         = "daviplata-tfstate-produccion"
+key            = "produccion/terraform.tfstate"
+region         = "us-east-1"
+dynamodb_table = "daviplata-tflock-produccion"
+encrypt        = true
