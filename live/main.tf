@@ -35,4 +35,3 @@ module "observability" {
   origin_latency_threshold_ms = var.origin_latency_threshold_ms
   tags                        = var.tags
 }
-# retry marker
