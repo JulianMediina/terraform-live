@@ -21,6 +21,62 @@ env:
   TF_VAR_notification_emails: ${{ secrets.NOTIFICATION_EMAILS }}
 
 jobs:
+  # Sin "environment:" a propósito -no tocan AWS, no necesitan esperar la
+  # aprobación del ambiente para dar feedback rápido en el PR.
+  branch-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validar convención de nombre de rama
+        run: |
+          base="${{ github.base_ref }}"
+          head="${{ github.head_ref }}"
+          case "$base" in
+            integracion)
+              if [[ ! "$head" =~ ^(feature|fix|release)/.+ ]]; then
+                echo "PR hacia integracion debe venir de feature/*, fix/* o release/* (rama: '$head')." >&2
+                exit 1
+              fi
+              ;;
+            laboratorio)
+              if [[ "$head" != "integracion" ]]; then
+                echo "PR hacia laboratorio debe venir de integracion (rama: '$head')." >&2
+                exit 1
+              fi
+              ;;
+            main)
+              if [[ "$head" != "laboratorio" ]]; then
+                echo "PR hacia main debe venir de laboratorio (rama: '$head')." >&2
+                exit 1
+              fi
+              ;;
+          esac
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  tflint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: live
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.53.0
+
+      - run: tflint --init
+      - run: tflint
+
   plan:
     runs-on: ubuntu-latest
     environment: ${{ github.base_ref == 'main' && 'produccion' || github.base_ref }}
