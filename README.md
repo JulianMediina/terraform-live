@@ -32,11 +32,15 @@ Cada `*.s3.tfbackend` apunta a un bucket de estado y una tabla de lock **exclusi
 
 ## Qué compone `live/main.tf`
 
-- `module.site_bucket` → `s3-site`
-- `module.cdn` → `cloudfront-oac`
+- `module.registry` → `ecr`
+- `module.service` → `ecs-express`
 - `module.observability` → `observability`
 
-La llave KMS del bucket de sitio no se pasa por variable manual: `data.aws_kms_alias.site` la resuelve por convención de nombre (`alias/daviplata-site-<ambiente>`), evitando hardcodear ARNs que cambian entre cuentas.
+La llave KMS del repositorio ECR no se pasa por variable manual: `data.aws_kms_alias.site` la resuelve por convención de nombre (`alias/daviplata-site-<ambiente>`), evitando hardcodear ARNs que cambian entre cuentas.
+
+## Arquitectura del sitio
+
+El sitio se sirve como un contenedor sobre Amazon ECS Express Mode (Fargate + Application Load Balancer + auto-scaling en un solo recurso), no como bucket S3 detrás de CloudFront. `daviplata-app` publica la imagen en el repositorio ECR de cada ambiente; `service_endpoint` expone la URL pública HTTPS del servicio.
 
 ## GitOps
 

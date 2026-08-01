@@ -1,8 +1,10 @@
-environment                 = "produccion"
-price_class                 = "PriceClass_100"
-force_destroy_site_bucket   = false
-error_rate_threshold        = 5
-origin_latency_threshold_ms = 1500
+environment                  = "produccion"
+cpu                          = "512"
+memory                       = "1024"
+min_task_count               = 1
+max_task_count               = 3
+cpu_utilization_threshold    = 75
+memory_utilization_threshold = 75
 
 tags = {
   Project     = "daviplata"

@@ -20,28 +20,28 @@ variable "region" {
   default     = "us-east-1"
 }
 
-variable "price_class" {
-  description = "Price class de CloudFront para este ambiente."
+variable "cpu" {
+  description = "CPU de la tarea Fargate, en unidades ECS (\"256\" = 0.25 vCPU)."
   type        = string
-  default     = "PriceClass_100"
+  default     = "256"
 }
 
-variable "aliases" {
-  description = "Dominios propios de la distribución (vacío = dominio por defecto de CloudFront)."
-  type        = list(string)
-  default     = []
-}
-
-variable "acm_certificate_arn" {
-  description = "ARN del certificado ACM en us-east-1, si se usan aliases."
+variable "memory" {
+  description = "Memoria de la tarea Fargate, en MB."
   type        = string
-  default     = null
+  default     = "512"
 }
 
-variable "force_destroy_site_bucket" {
-  description = "Permite destruir el bucket del sitio con objetos dentro. Solo true en ambientes no productivos."
-  type        = bool
-  default     = false
+variable "min_task_count" {
+  description = "Número mínimo de tareas activas del servicio."
+  type        = number
+  default     = 1
+}
+
+variable "max_task_count" {
+  description = "Número máximo de tareas activas del servicio."
+  type        = number
+  default     = 3
 }
 
 variable "notification_emails" {
@@ -49,16 +49,16 @@ variable "notification_emails" {
   type        = list(string)
 }
 
-variable "error_rate_threshold" {
-  description = "Umbral (%) de tasa de error que dispara la alarma."
+variable "cpu_utilization_threshold" {
+  description = "Umbral (%) de uso de CPU que dispara la alarma."
   type        = number
-  default     = 5
+  default     = 80
 }
 
-variable "origin_latency_threshold_ms" {
-  description = "Umbral de latencia de origen (ms) que dispara la alarma."
+variable "memory_utilization_threshold" {
+  description = "Umbral (%) de uso de memoria que dispara la alarma."
   type        = number
-  default     = 2000
+  default     = 80
 }
 
 variable "tags" {

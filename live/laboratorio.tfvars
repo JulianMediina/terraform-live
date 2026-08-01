@@ -1,8 +1,10 @@
-environment                 = "laboratorio"
-price_class                 = "PriceClass_100"
-force_destroy_site_bucket   = true
-error_rate_threshold        = 5
-origin_latency_threshold_ms = 2000
+environment                  = "laboratorio"
+cpu                          = "256"
+memory                       = "512"
+min_task_count               = 1
+max_task_count               = 2
+cpu_utilization_threshold    = 80
+memory_utilization_threshold = 80
 
 tags = {
   Project     = "daviplata"
