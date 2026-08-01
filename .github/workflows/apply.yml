@@ -13,13 +13,15 @@ on:
       - "live/**"
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
+  pull-requests: write
 
 env:
   TF_VERSION: "1.9.8"
   ENVIRONMENT: ${{ github.base_ref == 'main' && 'produccion' || github.base_ref }}
   TF_VAR_notification_emails: ${{ secrets.NOTIFICATION_EMAILS }}
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   apply:
@@ -33,6 +35,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -45,3 +48,88 @@ jobs:
 
       - run: terraform init -backend-config=${{ env.ENVIRONMENT }}.s3.tfbackend -reconfigure -input=false
       - run: terraform apply -var-file=${{ env.ENVIRONMENT }}.tfvars -auto-approve -input=false
+
+      # Confirma que el apply dejó la infraestructura exactamente como el
+      # plan decía -sin esto, un problema de consistencia eventual de AWS
+      # podría pasar desapercibido hasta el drift-detection del día siguiente.
+      - name: validar post-apply (sin drift)
+        id: postcheck
+        run: |
+          set +e
+          terraform plan -var-file=${{ env.ENVIRONMENT }}.tfvars -detailed-exitcode -no-color -out=/dev/null
+          echo "drift_exit=$?" >> "$GITHUB_OUTPUT"
+          set -e
+
+      # Smoke real: confirma que CloudFront+OAC+S3 sirven algo (no 5xx), sin
+      # depender de que exista contenido de la app -eso lo valida daviplata-app.
+      - name: smoke test del dominio
+        id: smoke
+        if: steps.postcheck.outputs.drift_exit == '0'
+        run: |
+          domain=$(terraform output -raw distribution_domain_name)
+          ok=false
+          for i in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://${domain}/" || echo "000")
+            if [[ "$code" =~ ^[23] ]] || [ "$code" = "404" ]; then
+              ok=true
+              break
+            fi
+            sleep 15
+          done
+          echo "ok=${ok}" >> "$GITHUB_OUTPUT"
+
+      # Rollback automático dentro del MISMO job: ya tiene la sesión OIDC
+      # autorizada de este apply, así que restaurar la configuración anterior
+      # no necesita pasar de nuevo por el gate de aprobación del ambiente.
+      # Nunca toca el .tfstate directamente -restaura el código y aplica de
+      # verdad, que es la única forma segura de "deshacer" en Terraform.
+      - name: rollback automático (re-aplicar la configuración anterior)
+        id: rollback
+        if: steps.postcheck.outputs.drift_exit == '2' || steps.smoke.outputs.ok == 'false'
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git checkout "origin/${{ github.base_ref }}~1" -- .
+          terraform init -backend-config=${{ env.ENVIRONMENT }}.s3.tfbackend -reconfigure -input=false
+          terraform apply -var-file=${{ env.ENVIRONMENT }}.tfvars -auto-approve -input=false
+
+      # La infraestructura ya quedó restaurada arriba; esto es solo para que
+      # el código en git no quede desincronizado de lo que en verdad está
+      # desplegado. Se revisa como cualquier otro cambio, sin prisa.
+      - name: abrir PR de reversión (para que el código coincida)
+        if: steps.rollback.outcome == 'success'
+        run: |
+          git config user.name "daviplata-ci"
+          git config user.email "ci@daviplata.local"
+          revert_branch="auto-revert/${{ env.ENVIRONMENT }}-${{ github.run_id }}"
+          git checkout -b "$revert_branch" "origin/${{ github.base_ref }}"
+          git revert --no-edit "origin/${{ github.base_ref }}"
+          git push origin "$revert_branch"
+          gh pr create --repo "${{ github.repository }}" \
+            --base "${{ github.base_ref }}" --head "$revert_branch" \
+            --title "Reversión automática: ${{ env.ENVIRONMENT }} falló la validación post-apply" \
+            --body "El apply a **${{ env.ENVIRONMENT }}** (PR #${{ github.event.pull_request.number }}) no pasó la validación post-despliegue. La infraestructura ya fue restaurada automáticamente a la versión anterior en el mismo run; este PR solo actualiza el código para que coincida con lo que está desplegado de verdad. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: notificar por correo (SNS)
+        if: always()
+        run: |
+          topic_arn=$(terraform output -raw sns_topic_arn 2>/dev/null || echo "")
+          if [ -z "$topic_arn" ]; then
+            echo "sin sns_topic_arn disponible, omito notificación"
+            exit 0
+          fi
+          if [ "${{ steps.rollback.outcome }}" = "success" ]; then
+            resultado="rollback automático (post-apply falló)"
+          elif [ "${{ job.status }}" = "success" ]; then
+            resultado="success"
+          else
+            resultado="failure"
+          fi
+          message=$(printf 'Ambiente: %s\nResultado: %s\nCommit: %s\nRun: %s' \
+            "${{ env.ENVIRONMENT }}" \
+            "$resultado" \
+            "${{ github.event.pull_request.head.sha }}" \
+            "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}")
+          aws sns publish \
+            --topic-arn "$topic_arn" \
+            --subject "terraform-live apply ${{ env.ENVIRONMENT }}: ${resultado}" \
+            --message "$message"
