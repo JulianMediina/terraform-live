@@ -105,6 +105,11 @@ jobs:
         run: |
           git config user.name "daviplata-ci"
           git config user.email "ci@daviplata.local"
+          # El paso de rollback de arriba dejó el working tree con la
+          # configuración anterior sin commitear (así fue como re-aplicó) -
+          # hay que descartarla antes de poder revertir limpio; la
+          # infraestructura ya quedó corregida, esto es solo git.
+          git checkout -- .
           revert_branch="auto-revert/${{ env.ENVIRONMENT }}-${{ github.run_id }}"
           git checkout -b "$revert_branch" "origin/${{ github.base_ref }}"
           git revert --no-edit "origin/${{ github.base_ref }}"
