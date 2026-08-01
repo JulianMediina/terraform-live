@@ -2,19 +2,29 @@
 
 Infraestructura por ambiente de la plataforma DaviPlata. Este repo **no declara recursos propios**: `live/` solo compone módulos publicados en [`terraform-modules`](https://github.com/JulianMediina/terraform-modules), fijados por tag (`?ref=vX.Y.Z`).
 
-> Nota sobre la guía original: una versión anterior del documento de referencia mencionaba una carpeta `global/bootstrap/` dentro de este repo. Esa responsabilidad se consolidó por completo en el repo `terraform-foundation` (repo independiente, estado local, ejecución única) para respetar la separación de responsabilidades del §0/§4.1 — aquí no existe.
+> Nota sobre la guía original: una versión anterior del documento de referencia mencionaba una carpeta `global/bootstrap/` dentro de este repo. Esa responsabilidad se consolidó por completo en el repo `terraform-foundation` (repo independiente, con su propio backend remoto y sus propios workflows) para respetar la separación de responsabilidades — aquí no existe.
 
-## Una sola carpeta, tres ambientes
+## Una sola carpeta de código, tres ramas de ambiente
 
-`live/` es la única raíz de código; **no se duplica** por ambiente. Lo que cambia por ambiente son los valores (`*.tfvars`) y la clave de estado remoto (`*.s3.tfbackend`):
+`live/` es la única raíz de código; **no se duplica** por ambiente. Lo que sí es distinto por ambiente son los valores (`*.tfvars`), la clave de estado remoto (`*.s3.tfbackend`) — y, con el modelo de ramas, **la rama donde vive el commit desplegado**:
+
+| Ambiente | Rama | tfvars |
+|---|---|---|
+| Integración | `integracion` | `live/integracion.tfvars` |
+| Laboratorio | `laboratorio` | `live/laboratorio.tfvars` |
+| Producción | `main` | `live/produccion.tfvars` |
+
+`main.tf`, `variables.tf`, `outputs.tf` son compartidos entre las tres ramas (viajan intactos en cada promoción). `source` y `version` de cada módulo son **literales** (Terraform los resuelve en `init`, antes de leer `.tfvars`), así que los tres ambientes usan siempre la misma versión de módulo.
+
+## Flujo de ramas (branch-per-environment)
 
 ```
-terraform init  -backend-config=produccion.s3.tfbackend -reconfigure
-terraform plan  -var-file=produccion.tfvars
-terraform apply -var-file=produccion.tfvars
+feature/algo → PR → integracion → PR → laboratorio → PR → main (producción)
 ```
 
-`main.tf`, `variables.tf`, `outputs.tf` son compartidos. `source` y `version` de cada módulo son **literales** (Terraform los resuelve en `init`, antes de leer `.tfvars`), así que los tres ambientes usan siempre la misma versión de módulo.
+- **Todo cambio nace en una rama `feature/*` (o `fix/*`) contra `integracion`** — nunca directo a `integracion`, `laboratorio` o `main`.
+- **La promoción entre ambientes es un PR entre ramas de ambiente** (`integracion`→`laboratorio`, `laboratorio`→`main`), revisado igual que cualquier otro PR — con el plan comentado automáticamente antes de aprobar.
+- El **mismo commit** avanza de rama en rama sin reescribirse: los workflows de apply no disparan con `push` a la rama, sino con el cierre del PR (`pull_request: types: [closed]`, `if: merged == true`), y usan `github.event.pull_request.head.sha` como referencia exacta — así el commit que se aplica es siempre el que se revisó, sin importar si GitHub usó "merge commit", "squash" o "rebase" para cerrar el PR.
 
 ## Backend remoto por ambiente
 
@@ -30,10 +40,10 @@ La llave KMS del bucket de sitio no se pasa por variable manual: `data.aws_kms_a
 
 ## GitOps
 
-- **Plan en PR:** `infra-plan.yml` corre `terraform plan` para los tres ambientes en cada PR que toque `live/**` y comenta el resultado — nadie hace `plan` desde su laptop.
-- **Apply al merge:** `infra-apply.yml` aplica en orden `integracion → laboratorio → producción`; laboratorio y producción están protegidos por reglas de aprobación de GitHub Environments (Settings → Environments).
-- **Drift detection:** `drift-detection.yml` corre diario (`terraform plan -detailed-exitcode`) y abre una incidencia si detecta divergencia.
-- Nadie ejecuta `apply` ni `destroy` manualmente desde su máquina salvo en `terraform-foundation` (bootstrap único) o en cierres de ambientes de prueba documentados en el runbook.
+- **Plan en PR:** `plan-integracion.yml` / `plan-laboratorio.yml` / `plan-produccion.yml` corren `terraform plan` para su ambiente en cada PR que apunte a su rama base, y comentan el resultado — nadie hace `plan` desde su laptop.
+- **Apply al mergear:** `apply-integracion.yml` / `apply-laboratorio.yml` / `apply-produccion.yml` aplican al cerrar (mergear) el PR correspondiente; laboratorio y producción están protegidos por reglas de aprobación de GitHub Environments (Settings → Environments).
+- **Drift detection:** `drift-detection.yml` corre diario contra las tres ramas (`terraform plan -detailed-exitcode` sobre el código de cada una) y abre una incidencia si detecta divergencia.
+- Nadie ejecuta `apply` ni `destroy` manualmente desde su máquina salvo en `terraform-foundation` (backend propio, ver su README) o en cierres de ambientes de prueba documentados en el runbook.
 
 ## Comandos locales de referencia
 

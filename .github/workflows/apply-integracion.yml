@@ -1,0 +1,46 @@
+name: apply-integracion
+
+# Dispara al cerrar (mergear) el PR hacia "integracion", no con push directo
+# a la rama: así se usa el SHA original del PR (github.event.pull_request.
+# head.sha) sin importar la estrategia de merge que use GitHub (merge commit,
+# squash o rebase todas cambian el SHA de la rama, pero head.sha siempre es
+# el commit real que se revisó y aprobó).
+on:
+  pull_request:
+    types: [closed]
+    branches: [integracion]
+    paths:
+      - "live/**"
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  TF_VERSION: "1.9.8"
+  ENVIRONMENT: integracion
+
+jobs:
+  apply:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    environment: integracion
+    defaults:
+      run:
+        working-directory: live
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - run: terraform init -backend-config=${{ env.ENVIRONMENT }}.s3.tfbackend -reconfigure -input=false
+      - run: terraform apply -var-file=${{ env.ENVIRONMENT }}.tfvars -auto-approve -input=false

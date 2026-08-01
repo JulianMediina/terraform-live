@@ -18,14 +18,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        environment: [integracion, laboratorio, produccion]
+        include:
+          - environment: integracion
+            branch: integracion
+          - environment: laboratorio
+            branch: laboratorio
+          - environment: produccion
+            branch: main
     runs-on: ubuntu-latest
     environment: ${{ matrix.environment }}
     defaults:
       run:
         working-directory: live
     steps:
+      # Cada ambiente vive en su propia rama (ver README) — el drift se
+      # revisa contra el código que realmente está desplegado ahí, no contra
+      # main a secas.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
 
       - uses: hashicorp/setup-terraform@v3
         with:
