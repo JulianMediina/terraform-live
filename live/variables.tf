@@ -45,9 +45,8 @@ variable "force_destroy_site_bucket" {
 }
 
 variable "notification_emails" {
-  description = "Correos suscritos a las alarmas de este ambiente."
+  description = "Correos suscritos a las alarmas de este ambiente. Sin default a propósito: se pasa por TF_VAR_notification_emails desde un secret de GitHub, nunca committeado en texto plano en un .tfvars público."
   type        = list(string)
-  default     = []
 }
 
 variable "error_rate_threshold" {

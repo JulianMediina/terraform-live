@@ -18,6 +18,7 @@ permissions:
 env:
   TF_VERSION: "1.9.8"
   ENVIRONMENT: ${{ github.base_ref == 'main' && 'produccion' || github.base_ref }}
+  TF_VAR_notification_emails: ${{ secrets.NOTIFICATION_EMAILS }}
 
 jobs:
   plan:
