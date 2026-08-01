@@ -40,8 +40,8 @@ La llave KMS del bucket de sitio no se pasa por variable manual: `data.aws_kms_a
 
 ## GitOps
 
-- **Plan en PR:** `plan-integracion.yml` / `plan-laboratorio.yml` / `plan-produccion.yml` corren `terraform plan` para su ambiente en cada PR que apunte a su rama base, y comentan el resultado — nadie hace `plan` desde su laptop.
-- **Apply al mergear:** `apply-integracion.yml` / `apply-laboratorio.yml` / `apply-produccion.yml` aplican al cerrar (mergear) el PR correspondiente; laboratorio y producción están protegidos por reglas de aprobación de GitHub Environments (Settings → Environments).
+- **Plan en PR:** un único `plan.yml` corre `terraform plan` en cualquier PR que apunte a `integracion`/`laboratorio`/`main`, y comenta el resultado — nadie hace `plan` desde su laptop. El ambiente se resuelve de la rama base del PR (`github.base_ref`), así que no hay tres copias del mismo archivo por mantener.
+- **Apply al mergear:** un único `apply.yml`, mismo patrón, dispara con `pull_request: types: [closed]` sobre las tres ramas; laboratorio y producción están protegidos por reglas de aprobación de GitHub Environments (Settings → Environments). Como el ambiente es dinámico, el gate de aprobación de cada ambiente se resuelve en tiempo de ejecución — el job de un PR contra `laboratorio` pide aprobación de `laboratorio`, uno contra `main` pide la de `produccion`.
 - **Drift detection:** `drift-detection.yml` corre diario contra las tres ramas (`terraform plan -detailed-exitcode` sobre el código de cada una) y abre una incidencia si detecta divergencia.
 - Nadie ejecuta `apply` ni `destroy` manualmente desde su máquina salvo en `terraform-foundation` (backend propio, ver su README) o en cierres de ambientes de prueba documentados en el runbook.
 
