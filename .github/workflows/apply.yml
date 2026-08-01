@@ -100,9 +100,19 @@ jobs:
         run: |
           git config user.name "daviplata-ci"
           git config user.email "ci@daviplata.local"
+          # El paso de rollback de arriba dejó el working tree Y el índice
+          # con la configuración anterior sin commitear (git checkout <ref>
+          # -- . también deja el índice modificado; "git checkout -- ."
+          # solo, sin ref, no lo deshace porque reconstruye desde ese mismo
+          # índice). Hace falta un reset --hard para limpiar los dos. La
+          # infraestructura ya quedó corregida, esto es solo git.
+          git reset --hard HEAD
           revert_branch="auto-revert/${{ env.ENVIRONMENT }}-${{ github.run_id }}"
           git checkout -b "$revert_branch" "origin/${{ github.base_ref }}"
-          git revert --no-edit "origin/${{ github.base_ref }}"
+          # -m 1: la punta de la rama de ambiente es casi siempre un commit
+          # de merge (todas las promociones usan "merge commit"), y git
+          # revert exige indicar qué padre es la línea principal a mantener.
+          git revert --no-edit -m 1 "origin/${{ github.base_ref }}"
           git push origin "$revert_branch"
           gh pr create --repo "${{ github.repository }}" \
             --base "${{ github.base_ref }}" --head "$revert_branch" \
