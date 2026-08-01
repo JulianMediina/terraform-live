@@ -1,7 +1,6 @@
 environment                 = "produccion"
 price_class                 = "PriceClass_100"
 force_destroy_site_bucket   = false
-notification_emails         = ["julian.mediina@gmail.com"]
 error_rate_threshold        = 5
 origin_latency_threshold_ms = 1500
 

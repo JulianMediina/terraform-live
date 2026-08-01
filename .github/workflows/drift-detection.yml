@@ -12,6 +12,7 @@ permissions:
 
 env:
   TF_VERSION: "1.9.8"
+  TF_VAR_notification_emails: ${{ secrets.NOTIFICATION_EMAILS }}
 
 jobs:
   detect:
