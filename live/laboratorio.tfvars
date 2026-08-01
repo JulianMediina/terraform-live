@@ -10,4 +10,5 @@ tags = {
   Environment = "laboratorio"
   CostCenter  = "devsecops-prueba"
   Owner       = "platform-team"
+  ManagedVia  = "terraform"
 }
