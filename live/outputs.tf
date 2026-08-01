@@ -1,16 +1,21 @@
-output "bucket_id" {
-  description = "Nombre del bucket del sitio, usado por el pipeline de despliegue."
-  value       = module.site_bucket.bucket_id
+output "repository_url" {
+  description = "URL del repositorio ECR, usado por el pipeline de despliegue para publicar imágenes."
+  value       = module.registry.repository_url
 }
 
-output "distribution_id" {
-  description = "ID de la distribución CloudFront, usado para invalidaciones."
-  value       = module.cdn.distribution_id
+output "cluster_name" {
+  description = "Nombre del cluster ECS, usado por el pipeline de despliegue."
+  value       = module.service.cluster_name
 }
 
-output "distribution_domain_name" {
-  description = "Dominio público del ambiente."
-  value       = module.cdn.distribution_domain_name
+output "service_name" {
+  description = "Nombre del servicio ECS Express, usado por el pipeline de despliegue para actualizar la imagen."
+  value       = module.service.service_name
+}
+
+output "service_endpoint" {
+  description = "URL pública HTTPS del ambiente."
+  value       = module.service.service_endpoint
 }
 
 output "sns_topic_arn" {

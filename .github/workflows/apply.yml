@@ -60,16 +60,16 @@ jobs:
           echo "drift_exit=$?" >> "$GITHUB_OUTPUT"
           set -e
 
-      # Smoke real: confirma que CloudFront+OAC+S3 sirven algo (no 5xx), sin
+      # Smoke real: confirma que el servicio ECS Express responde (no 5xx), sin
       # depender de que exista contenido de la app -eso lo valida daviplata-app.
-      - name: smoke test del dominio
+      - name: smoke test del endpoint
         id: smoke
         if: steps.postcheck.outputs.drift_exit == '0'
         run: |
-          domain=$(terraform output -raw distribution_domain_name)
+          endpoint=$(terraform output -raw service_endpoint)
           ok=false
-          for i in 1 2 3 4 5 6; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://${domain}/" || echo "000")
+          for i in 1 2 3 4 5 6 7 8; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://${endpoint}/" || echo "000")
             if [[ "$code" =~ ^[23] ]] || [ "$code" = "404" ]; then
               ok=true
               break
