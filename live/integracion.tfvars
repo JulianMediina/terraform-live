@@ -10,5 +10,5 @@ tags = {
   CostCenter  = "devsecops-prueba"
   Owner       = "platform-team"
   ManagedVia  = "terraform"
-  TestRun     = "rollback-verification"
+  TestRun     = "rollback-verification-2"
 }
