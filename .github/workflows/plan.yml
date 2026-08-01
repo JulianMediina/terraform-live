@@ -1,11 +1,12 @@
-name: plan-laboratorio
+name: plan
 
-# Promoción: el PR va de "integracion" hacia "laboratorio". "branches" filtra
-# por la rama BASE, así que esto corre en cualquier PR que apunte a
-# laboratorio, sin importar el nombre de la rama origen.
+# Un solo workflow para los 3 ambientes: "branches" filtra por la rama BASE
+# del PR (integracion/laboratorio/main), y el ambiente se resuelve a partir
+# de esa rama — "main" es la única que no comparte nombre con su ambiente
+# (produccion). Evita mantener 3 copias casi idénticas de este archivo.
 on:
   pull_request:
-    branches: [laboratorio]
+    branches: [integracion, laboratorio, main]
     paths:
       - "live/**"
 
@@ -16,12 +17,12 @@ permissions:
 
 env:
   TF_VERSION: "1.9.8"
-  ENVIRONMENT: laboratorio
+  ENVIRONMENT: ${{ github.base_ref == 'main' && 'produccion' || github.base_ref }}
 
 jobs:
   plan:
     runs-on: ubuntu-latest
-    environment: laboratorio
+    environment: ${{ github.base_ref == 'main' && 'produccion' || github.base_ref }}
     defaults:
       run:
         working-directory: live

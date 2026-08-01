@@ -1,11 +1,14 @@
-name: apply-produccion
+name: apply
 
-# El Environment "produccion" tiene revisor requerido — aprobación real de
-# cuatro ojos antes de que este job corra, además de la revisión del PR.
+# Dispara al cerrar (mergear) el PR hacia integracion/laboratorio/main, no con
+# push directo: así se usa el SHA original del PR (github.event.pull_request.
+# head.sha) sin importar la estrategia de merge que use GitHub. El ambiente
+# se resuelve de la rama BASE, igual que en plan.yml — "main" es la única
+# que no comparte nombre con su ambiente (produccion).
 on:
   pull_request:
     types: [closed]
-    branches: [main]
+    branches: [integracion, laboratorio, main]
     paths:
       - "live/**"
 
@@ -15,13 +18,13 @@ permissions:
 
 env:
   TF_VERSION: "1.9.8"
-  ENVIRONMENT: produccion
+  ENVIRONMENT: ${{ github.base_ref == 'main' && 'produccion' || github.base_ref }}
 
 jobs:
   apply:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-    environment: produccion
+    environment: ${{ github.base_ref == 'main' && 'produccion' || github.base_ref }}
     defaults:
       run:
         working-directory: live
