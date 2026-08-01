@@ -9,4 +9,5 @@ tags = {
   Project     = "daviplata"
   Environment = "integracion"
   CostCenter  = "devsecops-prueba"
+  Owner       = "platform-team"
 }
