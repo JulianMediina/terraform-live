@@ -45,6 +45,7 @@ jobs:
     steps:
       - name: resolver ambiente y rama
         id: ctx
+        working-directory: .
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             env_name="${{ inputs.environment }}"
