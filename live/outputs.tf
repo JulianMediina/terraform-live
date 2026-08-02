@@ -3,11 +3,6 @@ output "repository_url" {
   value       = module.registry.repository_url
 }
 
-output "service_arn" {
-  description = "ARN del servicio ECS Express, usado por el pipeline de despliegue para actualizar la imagen."
-  value       = module.service.service_arn
-}
-
 output "cluster_name" {
   description = "Nombre del cluster ECS, usado por el pipeline de despliegue."
   value       = module.service.cluster_name
