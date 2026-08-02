@@ -3,7 +3,7 @@
 # tres ambientes de esta misma carpeta comparten siempre la misma versión de
 # módulo; para versiones distintas simultáneas haría falta carpeta por ambiente.
 module "registry" {
-  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/ecr?ref=v0.2.0"
+  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/ecr?ref=v0.2.1"
 
   repository_name = "${var.project}-${var.environment}-site"
   environment     = var.environment
@@ -12,7 +12,7 @@ module "registry" {
 }
 
 module "service" {
-  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/ecs-express?ref=v0.2.0"
+  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/ecs-express?ref=v0.2.1"
 
   environment    = var.environment
   repository_url = module.registry.repository_url
@@ -25,7 +25,7 @@ module "service" {
 }
 
 module "observability" {
-  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/observability?ref=v0.2.0"
+  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/observability?ref=v0.2.1"
 
   environment                  = var.environment
   cluster_name                 = module.service.cluster_name
