@@ -5,12 +5,24 @@ name: apply
 # head.sha) sin importar la estrategia de merge que use GitHub. El ambiente
 # se resuelve de la rama BASE, igual que en plan.yml — "main" es la única
 # que no comparte nombre con su ambiente (produccion).
+# workflow_dispatch cubre el caso sin diff de código: reaplicar porque
+# cambió un secret (TF_VAR_notification_emails, AWS_ROLE_ARN, etc.) o para
+# corregir un drift que reportó drift-detection.yml (que solo detecta, nunca
+# aplica). Sin este trigger, esos casos exigirían fabricar un cambio vacío
+# en live/ solo para forzar el pipeline.
 on:
   pull_request:
     types: [closed]
     branches: [integracion, laboratorio, main]
     paths:
       - "live/**"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Ambiente a reaplicar (sin cambio de código)"
+        required: true
+        type: choice
+        options: [integracion, laboratorio, produccion]
 
 permissions:
   contents: write
@@ -19,22 +31,35 @@ permissions:
 
 env:
   TF_VERSION: "1.9.8"
-  ENVIRONMENT: ${{ github.base_ref == 'main' && 'produccion' || github.base_ref }}
   TF_VAR_notification_emails: ${{ secrets.NOTIFICATION_EMAILS }}
   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   apply:
-    if: github.event.pull_request.merged == true
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-    environment: ${{ github.base_ref == 'main' && 'produccion' || github.base_ref }}
+    environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || (github.base_ref == 'main' && 'produccion' || github.base_ref) }}
     defaults:
       run:
         working-directory: live
     steps:
+      - name: resolver ambiente y rama
+        id: ctx
+        working-directory: .
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            env_name="${{ inputs.environment }}"
+          else
+            base="${{ github.base_ref }}"
+            if [ "$base" = "main" ]; then env_name="produccion"; else env_name="$base"; fi
+          fi
+          if [ "$env_name" = "produccion" ]; then branch="main"; else branch="$env_name"; fi
+          echo "environment=${env_name}" >> "$GITHUB_OUTPUT"
+          echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && steps.ctx.outputs.branch || github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - uses: hashicorp/setup-terraform@v3
@@ -46,8 +71,8 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
 
-      - run: terraform init -backend-config=${{ env.ENVIRONMENT }}.s3.tfbackend -reconfigure -input=false
-      - run: terraform apply -var-file=${{ env.ENVIRONMENT }}.tfvars -auto-approve -input=false
+      - run: terraform init -backend-config=${{ steps.ctx.outputs.environment }}.s3.tfbackend -reconfigure -input=false
+      - run: terraform apply -var-file=${{ steps.ctx.outputs.environment }}.tfvars -auto-approve -input=false
 
       # Confirma que el apply dejó la infraestructura exactamente como el
       # plan decía -sin esto, un problema de consistencia eventual de AWS
@@ -56,7 +81,7 @@ jobs:
         id: postcheck
         run: |
           set +e
-          terraform plan -var-file=${{ env.ENVIRONMENT }}.tfvars -detailed-exitcode -no-color -out=/dev/null
+          terraform plan -var-file=${{ steps.ctx.outputs.environment }}.tfvars -detailed-exitcode -no-color -out=/dev/null
           echo "drift_exit=$?" >> "$GITHUB_OUTPUT"
           set -e
 
@@ -85,12 +110,12 @@ jobs:
       # verdad, que es la única forma segura de "deshacer" en Terraform.
       - name: rollback automático (re-aplicar la configuración anterior)
         id: rollback
-        if: steps.postcheck.outputs.drift_exit == '2' || steps.smoke.outputs.ok == 'false'
+        if: github.event_name == 'pull_request' && (steps.postcheck.outputs.drift_exit == '2' || steps.smoke.outputs.ok == 'false')
         run: |
           git fetch origin ${{ github.base_ref }}
           git checkout "origin/${{ github.base_ref }}~1" -- .
-          terraform init -backend-config=${{ env.ENVIRONMENT }}.s3.tfbackend -reconfigure -input=false
-          terraform apply -var-file=${{ env.ENVIRONMENT }}.tfvars -auto-approve -input=false
+          terraform init -backend-config=${{ steps.ctx.outputs.environment }}.s3.tfbackend -reconfigure -input=false
+          terraform apply -var-file=${{ steps.ctx.outputs.environment }}.tfvars -auto-approve -input=false
 
       # La infraestructura ya quedó restaurada arriba; esto es solo para que
       # el código en git no quede desincronizado de lo que en verdad está
@@ -107,7 +132,7 @@ jobs:
           # índice). Hace falta un reset --hard para limpiar los dos. La
           # infraestructura ya quedó corregida, esto es solo git.
           git reset --hard HEAD
-          revert_branch="auto-revert/${{ env.ENVIRONMENT }}-${{ github.run_id }}"
+          revert_branch="auto-revert/${{ steps.ctx.outputs.environment }}-${{ github.run_id }}"
           git checkout -b "$revert_branch" "origin/${{ github.base_ref }}"
           # -m 1: la punta de la rama de ambiente es casi siempre un commit
           # de merge (todas las promociones usan "merge commit"), y git
@@ -116,8 +141,8 @@ jobs:
           git push origin "$revert_branch"
           gh pr create --repo "${{ github.repository }}" \
             --base "${{ github.base_ref }}" --head "$revert_branch" \
-            --title "Reversión automática: ${{ env.ENVIRONMENT }} falló la validación post-apply" \
-            --body "El apply a **${{ env.ENVIRONMENT }}** (PR #${{ github.event.pull_request.number }}) no pasó la validación post-despliegue. La infraestructura ya fue restaurada automáticamente a la versión anterior en el mismo run; este PR solo actualiza el código para que coincida con lo que está desplegado de verdad. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            --title "Reversión automática: ${{ steps.ctx.outputs.environment }} falló la validación post-apply" \
+            --body "El apply a **${{ steps.ctx.outputs.environment }}** (PR #${{ github.event.pull_request.number }}) no pasó la validación post-despliegue. La infraestructura ya fue restaurada automáticamente a la versión anterior en el mismo run; este PR solo actualiza el código para que coincida con lo que está desplegado de verdad. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
       - name: notificar por correo (SNS)
         if: always()
@@ -135,11 +160,11 @@ jobs:
             resultado="failure"
           fi
           message=$(printf 'Ambiente: %s\nResultado: %s\nCommit: %s\nRun: %s' \
-            "${{ env.ENVIRONMENT }}" \
+            "${{ steps.ctx.outputs.environment }}" \
             "$resultado" \
-            "${{ github.event.pull_request.head.sha }}" \
+            "${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.pull_request.head.sha }}" \
             "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}")
           aws sns publish \
             --topic-arn "$topic_arn" \
-            --subject "terraform-live apply ${{ env.ENVIRONMENT }}: ${resultado}" \
+            --subject "terraform-live apply ${{ steps.ctx.outputs.environment }}: ${resultado}" \
             --message "$message"
