@@ -61,6 +61,18 @@ variable "memory_utilization_threshold" {
   default     = 80
 }
 
+variable "enable_response_time_alarm" {
+  description = "Habilita la alarma de tiempo de respuesta del ALB compartido. El ALB de ECS Express Mode es único por cuenta y lo comparten los 3 ambientes -normalmente se habilita en uno solo (produccion) para no triplicar la misma alarma bajo 3 nombres de ambiente distintos. Ver terraform-modules/modules/observability."
+  type        = bool
+  default     = false
+}
+
+variable "response_time_threshold_seconds" {
+  description = "Umbral (segundos) de tiempo de respuesta que dispara la alarma, si está habilitada."
+  type        = number
+  default     = 2
+}
+
 variable "tags" {
   description = "Tags comunes aplicados a todos los recursos del ambiente."
   type        = map(string)
