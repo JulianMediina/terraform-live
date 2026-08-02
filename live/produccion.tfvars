@@ -1,10 +1,10 @@
 environment                  = "produccion"
-cpu                          = "512"
-memory                       = "1024"
-min_task_count               = 1
-max_task_count               = 3
-cpu_utilization_threshold    = 75
-memory_utilization_threshold = 75
+cpu                           = "256"
+memory                        = "512"
+min_task_count                = 1
+max_task_count                = 2
+cpu_utilization_threshold     = 80
+memory_utilization_threshold  = 80
 
 tags = {
   Project     = "daviplata"
