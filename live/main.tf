@@ -2,36 +2,36 @@
 # antes de leer las .tfvars, así que no pueden depender de una variable. Los
 # tres ambientes de esta misma carpeta comparten siempre la misma versión de
 # módulo; para versiones distintas simultáneas haría falta carpeta por ambiente.
-module "site_bucket" {
-  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/s3-site?ref=v0.1.6"
+module "registry" {
+  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/ecr?ref=v0.2.1"
 
-  bucket_name   = "${var.project}-${var.environment}-site"
-  environment   = var.environment
-  kms_key_arn   = data.aws_kms_alias.site.target_key_arn
-  force_destroy = var.force_destroy_site_bucket
-  tags          = var.tags
+  repository_name = "${var.project}-${var.environment}-site"
+  environment     = var.environment
+  kms_key_arn     = data.aws_kms_alias.site.target_key_arn
+  tags            = var.tags
 }
 
-module "cdn" {
-  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/cloudfront-oac?ref=v0.1.6"
+module "service" {
+  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/ecs-express?ref=v0.2.1"
 
-  environment                 = var.environment
-  bucket_id                   = module.site_bucket.bucket_id
-  bucket_arn                  = module.site_bucket.bucket_arn
-  bucket_regional_domain_name = module.site_bucket.bucket_regional_domain_name
-  price_class                 = var.price_class
-  aliases                     = var.aliases
-  acm_certificate_arn         = var.acm_certificate_arn
-  tags                        = var.tags
+  environment    = var.environment
+  repository_url = module.registry.repository_url
+  kms_key_arn    = data.aws_kms_alias.site.target_key_arn
+  cpu            = var.cpu
+  memory         = var.memory
+  min_task_count = var.min_task_count
+  max_task_count = var.max_task_count
+  tags           = var.tags
 }
 
 module "observability" {
-  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/observability?ref=v0.1.6"
+  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/observability?ref=v0.2.1"
 
-  environment                 = var.environment
-  distribution_id             = module.cdn.distribution_id
-  notification_emails         = var.notification_emails
-  error_rate_threshold        = var.error_rate_threshold
-  origin_latency_threshold_ms = var.origin_latency_threshold_ms
-  tags                        = var.tags
+  environment                  = var.environment
+  cluster_name                 = module.service.cluster_name
+  service_name                 = module.service.service_name
+  notification_emails          = var.notification_emails
+  cpu_utilization_threshold    = var.cpu_utilization_threshold
+  memory_utilization_threshold = var.memory_utilization_threshold
+  tags                         = var.tags
 }

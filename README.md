@@ -32,19 +32,23 @@ Cada `*.s3.tfbackend` apunta a un bucket de estado y una tabla de lock **exclusi
 
 ## Qué compone `live/main.tf`
 
-- `module.site_bucket` → `s3-site`
-- `module.cdn` → `cloudfront-oac`
+- `module.registry` → `ecr`
+- `module.service` → `ecs-express`
 - `module.observability` → `observability`
 
-La llave KMS del bucket de sitio no se pasa por variable manual: `data.aws_kms_alias.site` la resuelve por convención de nombre (`alias/daviplata-site-<ambiente>`), evitando hardcodear ARNs que cambian entre cuentas.
+La llave KMS del repositorio ECR no se pasa por variable manual: `data.aws_kms_alias.site` la resuelve por convención de nombre (`alias/daviplata-site-<ambiente>`), evitando hardcodear ARNs que cambian entre cuentas.
+
+## Arquitectura del sitio
+
+El sitio se sirve como un contenedor sobre Amazon ECS Express Mode (Fargate + Application Load Balancer + auto-scaling en un solo recurso), no como bucket S3 detrás de CloudFront. `daviplata-app` publica la imagen en el repositorio ECR de cada ambiente; `service_endpoint` expone la URL pública HTTPS del servicio.
 
 ## GitOps
 
 - **Plan en PR:** un único `plan.yml` corre `terraform plan` en cualquier PR que apunte a `integracion`/`laboratorio`/`main`, y comenta el resultado — nadie hace `plan` desde su laptop. El ambiente se resuelve de la rama base del PR (`github.base_ref`), así que no hay tres copias del mismo archivo por mantener.
 - **Apply al mergear:** un único `apply.yml`, mismo patrón, dispara con `pull_request: types: [closed]` sobre las tres ramas; laboratorio y producción están protegidos por reglas de aprobación de GitHub Environments (Settings → Environments). Como el ambiente es dinámico, el gate de aprobación de cada ambiente se resuelve en tiempo de ejecución — el job de un PR contra `laboratorio` pide aprobación de `laboratorio`, uno contra `main` pide la de `produccion`.
 - **Drift detection:** `drift-detection.yml` corre diario contra las tres ramas (`terraform plan -detailed-exitcode` sobre el código de cada una) y abre una incidencia si detecta divergencia.
-- **Validación post-apply + rollback automático:** después de cada `apply` real, el mismo job vuelve a hacer `plan -detailed-exitcode` (confirma que quedó sin drift) y, en integración/laboratorio/producción, un smoke test del dominio de CloudFront. Si cualquiera falla, restaura la configuración anterior y la re-aplica **en el mismo job** (sin pasar de nuevo por el gate de aprobación, porque ya está autorizado) y abre un PR de reversión para que el código quede consistente con lo desplegado. Nunca toca el `.tfstate` directamente. Notifica el resultado por correo (SNS) siempre. Caso real documentado en [`docs/evidence/rollback/`](docs/evidence/rollback/).
-- Nadie ejecuta `apply` ni `destroy` manualmente desde su máquina salvo en `terraform-foundation` (backend propio, ver su README) o en cierres de ambientes de prueba documentados en el runbook.
+- **Validación post-apply + rollback automático:** después de cada `apply` real, el mismo job vuelve a hacer `plan -detailed-exitcode` (confirma que quedó sin drift) y, en integración/laboratorio/producción, un smoke test del endpoint del servicio. Si cualquiera falla, restaura la configuración anterior y la re-aplica **en el mismo job** (sin pasar de nuevo por el gate de aprobación, porque ya está autorizado) y abre un PR de reversión para que el código quede consistente con lo desplegado. Nunca toca el `.tfstate` directamente. Notifica el resultado por correo (SNS) siempre.
+- Nadie ejecuta `apply` ni `destroy` manualmente desde su máquina salvo en `terraform-foundation` (backend propio, ver su README).
 
 ## Comandos locales de referencia
 
