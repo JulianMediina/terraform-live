@@ -9,7 +9,7 @@ memory_utilization_threshold = 80
 tags = {
   Project     = "daviplata"
   Environment = "integracion"
-  CostCenter  = "daviplata-platform"
+  CostCenter  = "devsecops-prueba"
   Owner       = "platform-team"
   ManagedVia  = "terraform"
 }
