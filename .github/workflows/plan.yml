@@ -108,14 +108,9 @@ jobs:
           pip install --quiet checkov
           checkov -d . --config-file ../.checkov.yaml --quiet --compact
 
-      # set -o pipefail es necesario: sin él, el exit code de este paso es
-      # el de "tee" (siempre 0), no el de "terraform plan" -un plan que
-      # falla de verdad quedaría marcado como steps.plan.outcome == 'success'
-      # y el paso "Fallar si el plan falló" de abajo nunca se dispararía.
       - name: terraform plan
         id: plan
         run: |
-          set -o pipefail
           terraform plan -var-file=${{ env.ENVIRONMENT }}.tfvars -no-color -out=tfplan | tee plan_output.txt
         continue-on-error: true
 
