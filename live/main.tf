@@ -3,7 +3,7 @@
 # tres ambientes de esta misma carpeta comparten siempre la misma versión de
 # módulo; para versiones distintas simultáneas haría falta carpeta por ambiente.
 module "registry" {
-  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/ecr?ref=v0.4.0"
+  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/ecr?ref=v0.5.0"
 
   repository_name = "${var.project}-${var.environment}-site"
   environment     = var.environment
@@ -12,7 +12,7 @@ module "registry" {
 }
 
 module "service" {
-  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/ecs-express?ref=v0.4.0"
+  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/ecs-express?ref=v0.5.0"
 
   environment    = var.environment
   repository_url = module.registry.repository_url
@@ -25,15 +25,17 @@ module "service" {
 }
 
 module "observability" {
-  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/observability?ref=v0.4.0"
+  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/observability?ref=v0.5.0"
 
-  environment                  = var.environment
-  cluster_name                 = module.service.cluster_name
-  service_name                 = module.service.service_name
-  notification_emails          = var.notification_emails
-  cpu_utilization_threshold    = var.cpu_utilization_threshold
-  memory_utilization_threshold = var.memory_utilization_threshold
-  tags                         = var.tags
+  environment                     = var.environment
+  cluster_name                    = module.service.cluster_name
+  service_name                    = module.service.service_name
+  notification_emails             = var.notification_emails
+  cpu_utilization_threshold       = var.cpu_utilization_threshold
+  memory_utilization_threshold    = var.memory_utilization_threshold
+  enable_response_time_alarm      = var.enable_response_time_alarm
+  response_time_threshold_seconds = var.response_time_threshold_seconds
+  tags                            = var.tags
 }
 
 # Publica en SSM Parameter Store lo que daviplata-app necesita para su propio
@@ -42,7 +44,7 @@ module "observability" {
 # convención de ruta (/daviplata/<ambiente>/...) con el mismo rol OIDC que ya
 # usa para todo lo demás.
 module "parameters" {
-  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/ssm-publish?ref=v0.4.0"
+  source = "git::https://github.com/JulianMediina/terraform-modules.git//modules/ssm-publish?ref=v0.5.0"
 
   path_prefix = "/${var.project}/${var.environment}"
   parameters = {
